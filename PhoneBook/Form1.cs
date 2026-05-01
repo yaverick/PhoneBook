@@ -1,5 +1,4 @@
-﻿using PhoneBook;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -8,52 +7,38 @@ namespace PhoneBook
 {
     public partial class Form1 : Form
     {
-        // Використовуємо інтерфейс для доступу до даних (Абстракція)
         private IRepository<Contact> _repository;
 
         public Form1()
         {
-            // Ініціалізуємо конкретну реалізацію
-            _repository = new ContactRepository();
+            _repository = new ContactRepository(); // Репозиторій автоматично зчитує файл тут
             InitializeUI();
             SetupEventHandlers();
+
+            // Оновлюємо список одразу при старті, щоб показати завантажені дані
+            UpdateListBox();
         }
 
         // ── Елементи інтерфейсу ──────────────────────────────────────
         private ListBox listBoxContacts;
-
-        // Нові елементи для пошуку
         private Label labelSearch;
         private TextBox textBoxSearch;
-
-        private Label labelName;
-        private Label labelPhone;
-        private Label labelEmail;
-        private Label labelGroup;
-
-        private TextBox textBoxName;
-        private TextBox textBoxPhone;
-        private TextBox textBoxEmail;
+        private Label labelName, labelPhone, labelEmail, labelGroup;
+        private TextBox textBoxName, textBoxPhone, textBoxEmail;
         private ComboBox comboBoxGroup;
-
-        private Button buttonAdd;
-        private Button buttonEdit;
-        private Button buttonDelete;
-        private Button buttonClear;
+        private Button buttonAdd, buttonEdit, buttonDelete, buttonClear;
 
         // ── Ініціалізація інтерфейсу ─────────────────────────────────
         private void InitializeUI()
         {
-            this.Text = "📒 PhoneBook — Телефонна книга (Практична 3)";
+            this.Text = "📒 PhoneBook — Практична 5 (JSON Збереження)";
             this.Size = new Size(620, 520);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.MinimumSize = new Size(620, 520);
 
-            // --- Пошук (Нове) ---
             labelSearch = new Label { Text = "Пошук:", Location = new Point(12, 16), AutoSize = true, Font = new Font("Segoe UI", 9) };
             textBoxSearch = new TextBox { Location = new Point(65, 13), Size = new Size(327, 25), Font = new Font("Segoe UI", 10) };
 
-            // --- ListBox (Трохи змістили вниз через рядок пошуку) ---
             listBoxContacts = new ListBox
             {
                 Location = new Point(12, 45),
@@ -62,7 +47,6 @@ namespace PhoneBook
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Bottom
             };
 
-            // --- Інші поля (без змін) ---
             labelName = new Label { Text = "Ім'я:", Location = new Point(410, 20), AutoSize = true, Font = new Font("Segoe UI", 9) };
             labelPhone = new Label { Text = "Телефон:", Location = new Point(410, 70), AutoSize = true, Font = new Font("Segoe UI", 9) };
             labelEmail = new Label { Text = "Email:", Location = new Point(410, 120), AutoSize = true, Font = new Font("Segoe UI", 9) };
@@ -88,12 +72,9 @@ namespace PhoneBook
 
             this.Controls.AddRange(new Control[]
             {
-                labelSearch, textBoxSearch, // Додано на форму
-                listBoxContacts,
-                labelName, textBoxName,
-                labelPhone, textBoxPhone,
-                labelEmail, textBoxEmail,
-                labelGroup, comboBoxGroup,
+                labelSearch, textBoxSearch, listBoxContacts,
+                labelName, textBoxName, labelPhone, textBoxPhone,
+                labelEmail, textBoxEmail, labelGroup, comboBoxGroup,
                 buttonAdd, buttonEdit, buttonDelete, buttonClear
             });
         }
@@ -102,30 +83,25 @@ namespace PhoneBook
         private void SetupEventHandlers()
         {
             buttonAdd.Click += ButtonAdd_Click;
-            buttonClear.Click += ButtonClear_Click;
+            buttonEdit.Click += ButtonEdit_Click;
             buttonDelete.Click += ButtonDelete_Click;
-            listBoxContacts.SelectedIndexChanged += ListBoxContacts_SelectedIndexChanged;
+            buttonClear.Click += ButtonClear_Click;
 
-            // Подія для динамічного пошуку
+            listBoxContacts.SelectedIndexChanged += ListBoxContacts_SelectedIndexChanged;
             textBoxSearch.TextChanged += TextBoxSearch_TextChanged;
         }
 
         private void TextBoxSearch_TextChanged(object sender, EventArgs e)
         {
             string query = textBoxSearch.Text.ToLower();
-
             if (string.IsNullOrWhiteSpace(query))
             {
-                UpdateListBox(); // Якщо поле пусте — показуємо всіх
+                UpdateListBox();
             }
             else
             {
-                // Шукаємо контакти, де ім'я або телефон містять введений текст
-                var filteredContacts = _repository.Find(c =>
-                    c.Name.ToLower().Contains(query) ||
-                    c.Phone.Contains(query));
-
-                UpdateListBox(filteredContacts);
+                var filtered = _repository.Find(c => c.Name.ToLower().Contains(query) || c.Phone.Contains(query));
+                UpdateListBox(filtered);
             }
         }
 
@@ -133,24 +109,44 @@ namespace PhoneBook
         {
             if (string.IsNullOrWhiteSpace(textBoxName.Text) || string.IsNullOrWhiteSpace(textBoxPhone.Text))
             {
-                MessageBox.Show("Будь ласка, заповніть хоча б ім'я та телефон.", "Помилка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Заповніть ім'я та телефон.", "Помилка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            Contact newContact = new Contact(
-                textBoxName.Text, textBoxPhone.Text, textBoxEmail.Text, (ContactGroup)comboBoxGroup.SelectedItem
-            );
+            Contact newContact = new Contact(textBoxName.Text, textBoxPhone.Text, textBoxEmail.Text, (ContactGroup)comboBoxGroup.SelectedItem);
+            _repository.Add(newContact); // Тепер цей метод автоматично зберігає у файл
 
-            _repository.Add(newContact);
             UpdateListBox();
             ClearInputFields();
+        }
+
+        private void ButtonEdit_Click(object sender, EventArgs e)
+        {
+            if (listBoxContacts.SelectedItem is Contact selectedContact)
+            {
+                if (string.IsNullOrWhiteSpace(textBoxName.Text) || string.IsNullOrWhiteSpace(textBoxPhone.Text))
+                {
+                    MessageBox.Show("Ім'я та телефон не можуть бути порожніми.", "Помилка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                selectedContact.Name = textBoxName.Text;
+                selectedContact.Phone = textBoxPhone.Text;
+                selectedContact.Email = textBoxEmail.Text;
+                selectedContact.Group = (ContactGroup)comboBoxGroup.SelectedItem;
+
+                _repository.Update(selectedContact); // Тепер цей метод автоматично зберігає у файл
+
+                UpdateListBox();
+                ClearInputFields();
+            }
         }
 
         private void ButtonDelete_Click(object sender, EventArgs e)
         {
             if (listBoxContacts.SelectedItem is Contact selectedContact)
             {
-                _repository.Remove(selectedContact);
+                _repository.Remove(selectedContact); // Тепер цей метод автоматично зберігає у файл
                 UpdateListBox();
                 ClearInputFields();
             }
@@ -174,15 +170,9 @@ namespace PhoneBook
             }
         }
 
-        // ── Допоміжні методи ─────────────────────────────────────────
-
-        // Метод тепер вміє приймати відфільтрований список для пошуку
         private void UpdateListBox(IEnumerable<Contact> contactsToDisplay = null)
         {
             listBoxContacts.Items.Clear();
-
-            // Якщо передали список (наприклад, при пошуку) — використовуємо його,
-            // інакше беремо всі контакти з репозиторію
             var items = contactsToDisplay ?? _repository.GetAll();
 
             foreach (var contact in items)
@@ -198,6 +188,7 @@ namespace PhoneBook
             textBoxEmail.Clear();
             comboBoxGroup.SelectedIndex = 0;
             listBoxContacts.ClearSelected();
+            buttonEdit.Enabled = false;
         }
     }
 }
