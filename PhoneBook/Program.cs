@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations; // ДОДАНО ДЛЯ ВАЛІДАЦІЇ
+using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
@@ -8,11 +8,13 @@ using System.Windows.Forms;
 
 namespace PhoneBook
 {
+    // Перелік для категоризації контактів у телефонній книзі
     public enum ContactGroup { Родина, Друзі, Робота, Інше }
 
-    // ── 3. Використання атрибутів валідації ──────────────────────────
+    // Клас-модель для представлення одного контакту
     public class Contact
     {
+        // Атрибути валідації для перевірки введених користувачем даних
         [Required(ErrorMessage = "Поле 'Ім'я' є обов'язковим.")]
         [StringLength(50, MinimumLength = 2, ErrorMessage = "Ім'я має містити від 2 до 50 символів.")]
         public string Name { get; set; }
@@ -21,14 +23,15 @@ namespace PhoneBook
         [RegularExpression(@"^\+?\d{10,15}$", ErrorMessage = "Телефон має містити від 10 до 15 цифр і може починатися з '+'.")]
         public string Phone { get; set; }
 
-        // Email не обов'язковий, але якщо введений - перевіряємо формат
         [EmailAddress(ErrorMessage = "Некоректний формат Email-адреси.")]
         public string Email { get; set; }
 
         public ContactGroup Group { get; set; }
 
+        // Порожній конструктор, який вимагає бібліотека System.Text.Json для завантаження з файлу
         public Contact() { }
 
+        // Основний конструктор для створення об'єкта в програмі
         public Contact(string name, string phone, string email, ContactGroup group)
         {
             Name = name;
@@ -37,9 +40,11 @@ namespace PhoneBook
             Group = group;
         }
 
+        // Перевизначення методу для гарного відображення у списку ListBox
         public override string ToString() => $"{Name} [{Group}] | {Phone}";
     }
 
+    // Універсальний інтерфейс для реалізації CRUD-операцій
     public interface IRepository<T>
     {
         void Add(T item);
@@ -49,16 +54,22 @@ namespace PhoneBook
         IEnumerable<T> Find(Func<T, bool> predicate);
     }
 
+    // Клас для управління списком контактів та їх збереженням
     public class ContactRepository : IRepository<Contact>
     {
         private List<Contact> _contacts;
-        private readonly string _filePath = "contacts.json";
 
-        public ContactRepository()
+        // Шлях до файлу тепер можна змінювати, що корисно для тестування
+        private readonly string _filePath;
+
+        // Конструктор приймає шлях до файлу (за замовчуванням це contacts.json)
+        public ContactRepository(string filePath = "contacts.json")
         {
+            _filePath = filePath;
             LoadFromFile();
         }
 
+        // Метод для збереження поточного списку у JSON файл
         private void SaveToFile()
         {
             var options = new JsonSerializerOptions { WriteIndented = true };
@@ -66,6 +77,7 @@ namespace PhoneBook
             File.WriteAllText(_filePath, jsonString);
         }
 
+        // Метод для зчитування даних з файлу під час старту
         private void LoadFromFile()
         {
             if (File.Exists(_filePath))
@@ -75,17 +87,17 @@ namespace PhoneBook
             }
             else
             {
+                // Якщо файлу ще немає, створюємо порожній список
                 _contacts = new List<Contact>();
             }
         }
 
-        // ── 1. Реалізація основного бізнес-правила ───────────────────
+        // Додавання контакту з перевіркою бізнес-правила
         public void Add(Contact item)
         {
-            // Очищаємо номери від пробілів для точного порівняння
             string newPhone = item.Phone.Replace(" ", "");
 
-            // Бізнес-правило: Унікальність номера телефону
+            // Перевірка на унікальність номера телефону
             bool isDuplicate = _contacts.Any(c => c.Phone.Replace(" ", "") == newPhone);
 
             if (isDuplicate)
@@ -97,11 +109,13 @@ namespace PhoneBook
             SaveToFile();
         }
 
+        // Повернення всіх контактів (доступ лише для читання)
         public IEnumerable<Contact> GetAll() => _contacts.AsReadOnly();
 
+        // Оновлення існуючого контакту
         public void Update(Contact item)
         {
-            int index = _contacts.FindIndex(c => c.Phone == item.Phone); // Шукаємо за телефоном
+            int index = _contacts.FindIndex(c => c.Phone == item.Phone);
             if (index != -1)
             {
                 _contacts[index] = item;
@@ -109,12 +123,14 @@ namespace PhoneBook
             }
         }
 
+        // Видалення контакту
         public void Remove(Contact item)
         {
             _contacts.Remove(item);
             SaveToFile();
         }
 
+        // Пошук контактів за певним критерієм (ім'ям або телефоном)
         public IEnumerable<Contact> Find(Func<Contact, bool> predicate)
         {
             return _contacts.Where(predicate).ToList();
@@ -123,6 +139,7 @@ namespace PhoneBook
 
     static class Program
     {
+        // Точка входу в програму
         [STAThread]
         static void Main()
         {
