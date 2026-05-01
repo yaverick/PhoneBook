@@ -1,4 +1,6 @@
-﻿using System;
+﻿using PhoneBook;
+using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 
@@ -6,29 +8,33 @@ namespace PhoneBook
 {
     public partial class Form1 : Form
     {
-        // Екземпляр нашого менеджера контактів (зв'язок класів)
-        private PhoneBookManager _manager;
+        // Використовуємо інтерфейс для доступу до даних (Абстракція)
+        private IRepository<Contact> _repository;
 
         public Form1()
         {
-            _manager = new PhoneBookManager();
+            // Ініціалізуємо конкретну реалізацію
+            _repository = new ContactRepository();
             InitializeUI();
-            SetupEventHandlers(); // Підключаємо логіку кнопок
+            SetupEventHandlers();
         }
 
         // ── Елементи інтерфейсу ──────────────────────────────────────
-
         private ListBox listBoxContacts;
+
+        // Нові елементи для пошуку
+        private Label labelSearch;
+        private TextBox textBoxSearch;
 
         private Label labelName;
         private Label labelPhone;
         private Label labelEmail;
-        private Label labelGroup; // Новий Label для Enum
+        private Label labelGroup;
 
         private TextBox textBoxName;
         private TextBox textBoxPhone;
         private TextBox textBoxEmail;
-        private ComboBox comboBoxGroup; // Dropdown для Enum
+        private ComboBox comboBoxGroup;
 
         private Button buttonAdd;
         private Button buttonEdit;
@@ -36,31 +42,32 @@ namespace PhoneBook
         private Button buttonClear;
 
         // ── Ініціалізація інтерфейсу ─────────────────────────────────
-
         private void InitializeUI()
         {
-            // --- Вікно ---
-            this.Text = "📒 PhoneBook — Телефонна книга";
-            this.Size = new Size(620, 520); // Трохи збільшив висоту для ComboBox
+            this.Text = "📒 PhoneBook — Телефонна книга (Практична 3)";
+            this.Size = new Size(620, 520);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.MinimumSize = new Size(620, 520);
 
-            // --- ListBox ---
+            // --- Пошук (Нове) ---
+            labelSearch = new Label { Text = "Пошук:", Location = new Point(12, 16), AutoSize = true, Font = new Font("Segoe UI", 9) };
+            textBoxSearch = new TextBox { Location = new Point(65, 13), Size = new Size(327, 25), Font = new Font("Segoe UI", 10) };
+
+            // --- ListBox (Трохи змістили вниз через рядок пошуку) ---
             listBoxContacts = new ListBox
             {
-                Location = new Point(12, 12),
-                Size = new Size(380, 450),
+                Location = new Point(12, 45),
+                Size = new Size(380, 415),
                 Font = new Font("Segoe UI", 10),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Bottom
             };
 
-            // --- Labels ---
+            // --- Інші поля (без змін) ---
             labelName = new Label { Text = "Ім'я:", Location = new Point(410, 20), AutoSize = true, Font = new Font("Segoe UI", 9) };
             labelPhone = new Label { Text = "Телефон:", Location = new Point(410, 70), AutoSize = true, Font = new Font("Segoe UI", 9) };
             labelEmail = new Label { Text = "Email:", Location = new Point(410, 120), AutoSize = true, Font = new Font("Segoe UI", 9) };
             labelGroup = new Label { Text = "Група:", Location = new Point(410, 170), AutoSize = true, Font = new Font("Segoe UI", 9) };
 
-            // --- TextBoxes & ComboBox ---
             textBoxName = new TextBox { Location = new Point(410, 40), Size = new Size(180, 25), Font = new Font("Segoe UI", 10) };
             textBoxPhone = new TextBox { Location = new Point(410, 90), Size = new Size(180, 25), Font = new Font("Segoe UI", 10) };
             textBoxEmail = new TextBox { Location = new Point(410, 140), Size = new Size(180, 25), Font = new Font("Segoe UI", 10) };
@@ -70,22 +77,20 @@ namespace PhoneBook
                 Location = new Point(410, 190),
                 Size = new Size(180, 25),
                 Font = new Font("Segoe UI", 10),
-                DropDownStyle = ComboBoxStyle.DropDownList // Щоб не можна було вводити свій текст
+                DropDownStyle = ComboBoxStyle.DropDownList
             };
-            // Заповнюємо ComboBox значеннями з нашого Enum
             comboBoxGroup.DataSource = Enum.GetValues(typeof(ContactGroup));
 
-            // --- Buttons ---
             buttonAdd = new Button { Text = "Додати", Location = new Point(410, 235), Size = new Size(180, 35), Font = new Font("Segoe UI", 10) };
-            buttonEdit = new Button { Text = "Редагувати", Location = new Point(410, 280), Size = new Size(180, 35), Font = new Font("Segoe UI", 10), Enabled = false }; // Вимкнена, поки не вибрано контакт
+            buttonEdit = new Button { Text = "Редагувати", Location = new Point(410, 280), Size = new Size(180, 35), Font = new Font("Segoe UI", 10), Enabled = false };
             buttonDelete = new Button { Text = "Видалити", Location = new Point(410, 325), Size = new Size(180, 35), Font = new Font("Segoe UI", 10) };
             buttonClear = new Button { Text = "Очистити поля", Location = new Point(410, 380), Size = new Size(180, 35), Font = new Font("Segoe UI", 10) };
 
-            // --- Додаємо на форму ---
             this.Controls.AddRange(new Control[]
             {
+                labelSearch, textBoxSearch, // Додано на форму
                 listBoxContacts,
-                labelName,  textBoxName,
+                labelName, textBoxName,
                 labelPhone, textBoxPhone,
                 labelEmail, textBoxEmail,
                 labelGroup, comboBoxGroup,
@@ -93,35 +98,50 @@ namespace PhoneBook
             });
         }
 
-        // ── Логіка роботи програми (Events) ──────────────────────────
-
+        // ── Логіка роботи програми ───────────────────────────────────
         private void SetupEventHandlers()
         {
             buttonAdd.Click += ButtonAdd_Click;
             buttonClear.Click += ButtonClear_Click;
             buttonDelete.Click += ButtonDelete_Click;
             listBoxContacts.SelectedIndexChanged += ListBoxContacts_SelectedIndexChanged;
+
+            // Подія для динамічного пошуку
+            textBoxSearch.TextChanged += TextBoxSearch_TextChanged;
+        }
+
+        private void TextBoxSearch_TextChanged(object sender, EventArgs e)
+        {
+            string query = textBoxSearch.Text.ToLower();
+
+            if (string.IsNullOrWhiteSpace(query))
+            {
+                UpdateListBox(); // Якщо поле пусте — показуємо всіх
+            }
+            else
+            {
+                // Шукаємо контакти, де ім'я або телефон містять введений текст
+                var filteredContacts = _repository.Find(c =>
+                    c.Name.ToLower().Contains(query) ||
+                    c.Phone.Contains(query));
+
+                UpdateListBox(filteredContacts);
+            }
         }
 
         private void ButtonAdd_Click(object sender, EventArgs e)
         {
-            // Перевірка, чи не порожні поля
             if (string.IsNullOrWhiteSpace(textBoxName.Text) || string.IsNullOrWhiteSpace(textBoxPhone.Text))
             {
                 MessageBox.Show("Будь ласка, заповніть хоча б ім'я та телефон.", "Помилка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            // Створюємо новий об'єкт
             Contact newContact = new Contact(
-                textBoxName.Text,
-                textBoxPhone.Text,
-                textBoxEmail.Text,
-                (ContactGroup)comboBoxGroup.SelectedItem // Беремо значення Enum
+                textBoxName.Text, textBoxPhone.Text, textBoxEmail.Text, (ContactGroup)comboBoxGroup.SelectedItem
             );
 
-            // Додаємо через менеджера і оновлюємо список
-            _manager.AddContact(newContact);
+            _repository.Add(newContact);
             UpdateListBox();
             ClearInputFields();
         }
@@ -130,18 +150,14 @@ namespace PhoneBook
         {
             if (listBoxContacts.SelectedItem is Contact selectedContact)
             {
-                _manager.RemoveContact(selectedContact);
+                _repository.Remove(selectedContact);
                 UpdateListBox();
                 ClearInputFields();
             }
         }
 
-        private void ButtonClear_Click(object sender, EventArgs e)
-        {
-            ClearInputFields();
-        }
+        private void ButtonClear_Click(object sender, EventArgs e) => ClearInputFields();
 
-        // Відображення даних при кліку на контакт у списку
         private void ListBoxContacts_SelectedIndexChanged(object sender, EventArgs e)
         {
             if (listBoxContacts.SelectedItem is Contact selectedContact)
@@ -150,7 +166,7 @@ namespace PhoneBook
                 textBoxPhone.Text = selectedContact.Phone;
                 textBoxEmail.Text = selectedContact.Email;
                 comboBoxGroup.SelectedItem = selectedContact.Group;
-                buttonEdit.Enabled = true; // Можна додати логіку редагування пізніше
+                buttonEdit.Enabled = true;
             }
             else
             {
@@ -160,10 +176,16 @@ namespace PhoneBook
 
         // ── Допоміжні методи ─────────────────────────────────────────
 
-        private void UpdateListBox()
+        // Метод тепер вміє приймати відфільтрований список для пошуку
+        private void UpdateListBox(IEnumerable<Contact> contactsToDisplay = null)
         {
             listBoxContacts.Items.Clear();
-            foreach (var contact in _manager.Contacts)
+
+            // Якщо передали список (наприклад, при пошуку) — використовуємо його,
+            // інакше беремо всі контакти з репозиторію
+            var items = contactsToDisplay ?? _repository.GetAll();
+
+            foreach (var contact in items)
             {
                 listBoxContacts.Items.Add(contact);
             }

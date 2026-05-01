@@ -1,28 +1,20 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace PhoneBook
 {
-    // ── 5. Використання перерахування (enum) ─────────────────────────
-    public enum ContactGroup
-    {
-        Родина,
-        Друзі,
-        Робота,
-        Інше
-    }
+    // ── Модель даних ─────────────────────────────────────────────────
+    public enum ContactGroup { Родина, Друзі, Робота, Інше }
 
-    // ── 1. Класи предметної області ──────────────────────────────────
     public class Contact
     {
-        // ── 2. Інкапсуляція даних ────────────────────────────────────
         public string Name { get; set; }
         public string Phone { get; set; }
         public string Email { get; set; }
         public ContactGroup Group { get; set; }
 
-        // ── 3. Реалізація конструкторів ──────────────────────────────
         public Contact(string name, string phone, string email, ContactGroup group)
         {
             Name = name;
@@ -31,37 +23,43 @@ namespace PhoneBook
             Group = group;
         }
 
-        public override string ToString()
-        {
-            return $"{Name} [{Group}] | {Phone}";
-        }
+        public override string ToString() => $"{Name} [{Group}] | {Phone}";
     }
 
-    // ── 4. Зв'язки між класами (PhoneBookManager містить Contact) ────
-    public class PhoneBookManager
+    // ── 2. Реалізація інтерфейсу IRepository<T> (Generics) ───────────
+    public interface IRepository<T>
     {
-        // Прихований список контактів (інкапсуляція)
-        private List<Contact> _contacts;
+        void Add(T item);
+        void Remove(T item);
+        IEnumerable<T> GetAll();
+        IEnumerable<T> Find(Func<T, bool> predicate); // 3. Пошук об'єктів
+    }
 
-        public PhoneBookManager()
+    // ── 4. Відокремлення логіки (Паттерн Repository) ─────────────────
+    public class ContactRepository : IRepository<Contact>
+    {
+        // 1. Зберігання об'єктів у колекції
+        private List<Contact> _contacts = new List<Contact>();
+
+        public void Add(Contact item)
         {
-            _contacts = new List<Contact>();
+            _contacts.Add(item);
         }
 
-        // Публічний доступ до списку тільки для читання, щоб уникнути пошкодження даних
-        public IReadOnlyList<Contact> Contacts => _contacts.AsReadOnly();
-
-        public void AddContact(Contact contact)
+        public void Remove(Contact item)
         {
-            _contacts.Add(contact);
+            _contacts.Remove(item);
         }
 
-        public void RemoveContact(Contact contact)
+        public IEnumerable<Contact> GetAll()
         {
-            if (_contacts.Contains(contact))
-            {
-                _contacts.Remove(contact);
-            }
+            return _contacts.AsReadOnly();
+        }
+
+        // Реалізація пошуку за допомогою LINQ
+        public IEnumerable<Contact> Find(Func<Contact, bool> predicate)
+        {
+            return _contacts.Where(predicate).ToList();
         }
     }
 
